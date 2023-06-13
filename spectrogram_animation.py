@@ -18,7 +18,6 @@ VMAX = 3
 target_frequency = 50
 tolerance = 20
 
-
 p = pyaudio.PyAudio()
 
 stream = p.open(
@@ -43,20 +42,21 @@ plt.colorbar(spectrogram, label="Амплитуда")
 
 columns = np.zeros((spectrogram_data.shape[0], NUM_COLUMNS))
 
-
-# class HarmRect:
-#     def __init__(self, init_rect_x=0.04, init_rect_y=0, rect_width = 0.001, rect_height = 500):
-#         self.rect_x = init_rect_x  # Координата x (время) квадрата
-#         self.rect_y = init_rect_y  # Начальная координата y (частота) квадрата
-#         self.width = rect_width  # Ширина квадрата
-#         self.height = rect_height  # Высота квадрата (диапазон частоты)
-#
-#     def show_info(self):
-#         print('rect_x=', self.rect_x, ' rect_y=', self.rect_y, ' width=', self.width, ' height=', self.height)
-
+fig2, ax2 = plt.subplots()
+plt.xlabel("Частота (Гц)")
+plt.ylabel("Амплитуда")
+plt.title("Амплитудно-частотная характеристика")
 
 rects = []
 
+# Обновление амплитудно-частотной характеристики
+freq = frequencies[:int(MAX_FREQUENCY)]
+amplitude = np.max(spectrogram_data[:int(MAX_FREQUENCY)], axis=1)
+line, = ax2.plot(freq, amplitude, color='blue')
+
+# Установка пределов для осей
+ax2.set_xlim(0, MAX_FREQUENCY)
+ax2.set_ylim(0, np.max(amplitude) * 1.1)
 
 def update_spectrogram(a):
     fig.set_facecolor('white')
@@ -72,7 +72,7 @@ def update_spectrogram(a):
     # Расчет спектрограммы
     frequencies, times, spectrogram_data = signal.spectrogram(audio, fs=RATE, window='hann', nperseg=2048, noverlap=1024)
 
-    y = 1500000
+    y = 1000000
     db = 20 * np.log10(abs(spectrogram_data) / y)
     if -10 <= np.max(db) <= 0:
         print('Опасная зона!')
@@ -92,51 +92,69 @@ def update_spectrogram(a):
     spectrogram.set_array(columns)
 
     # Поиск областей с положительной громкостью
-    positive_areas = np.where(spectrogram_data[:int(MAX_FREQUENCY), :] > 0)
+    danger_areas = np.where(spectrogram_data[:int(MAX_FREQUENCY), :] > -40)
 
     # Создание новых квадратов в местах скачков амплитуды
-    for freq_idx, col_idx in zip(positive_areas[0], positive_areas[1]):
-        if len(rects) > 4:
-            break
-        elif len(rects) == 0:
-            rect_x = 0.05  # Координата x (время) квадрата
+    for freq_idx, col_idx in zip(danger_areas[0], danger_areas[1]):
+        if int(frequencies[freq_idx]) % 50 == 0:
+            print(frequencies[freq_idx])
+            rect_x = 0.0473  # Координата x (время) квадрата
             rect_y = frequencies[freq_idx]  # Начальная координата y (частота) квадрата
-            rect_width = -0.001  # Ширина квадрата
-            rect_height = 200  # Высота квадрата (диапазон частоты)
+            rect_width = -0.0005  # Ширина квадрата
+            rect_height = 50  # Высота квадрата (диапазон частоты)
             rect_xy = (rect_x, rect_y)
-
-            rect = plt.Rectangle(rect_xy, rect_width, rect_height, facecolor='white', alpha=0.8)
-            ax.add_patch(rect)
-            rects.append(rect)
-        elif len(rects) > 0:
-            rect_x = 0.05  # Координата x (время) квадрата
-            rect_y = frequencies[freq_idx]  # Начальная координата y (частота) квадрата
-            rect_width = -0.001  # Ширина квадрата
-            rect_height = 200  # Высота квадрата (диапазон частоты)
-            rect_xy = (rect_x, rect_y)
-            for rect in rects:
-                if abs(rect_y - rect.get_x()) > 200:
-                    rect = plt.Rectangle(rect_xy, rect_width, rect_height, facecolor='white', alpha=0.8)
+            if len(rects) > 250:
+                break
+            elif len(rects) == 0:
+                rect = plt.Rectangle(rect_xy, rect_width, rect_height, facecolor='white', alpha=0.8)
+                ax.add_patch(rect)
+                rects.append(rect)
+            elif len(rects) > 0:
+                add_rect = True
+                for existing_rect in rects:
+                    if abs(rect_y - existing_rect.get_y()) <= 20:
+                        add_rect = False
+                        break
+                if add_rect:
+                    rect = plt.Rectangle(rect_xy, rect_width, rect_height, facecolor='red', alpha=0.8)
                     ax.add_patch(rect)
                     rects.append(rect)
-
-                    # print(len(rects))
-
 
     if len(rects) > 0:
         new_rects = []
         for rect in rects:
             if rect.get_x() > 0.023:
                 rect.set_x(rect.get_x() - 0.023 / NUM_COLUMNS)
-                print(rect.get_x())
                 new_rects.append(rect)
         rects = new_rects
 
-
     return (spectrogram, *rects)
+
+def update_amp_freq(a):
+    # Чтение аудиоданных из потока
+    data = stream.read(CHUNK)
+
+    # Преобразование байтовых данных в числовой массив
+    audio = np.frombuffer(data, dtype=np.int16)
+
+    # Расчет спектрограммы
+    frequencies, times, spectrogram_data = signal.spectrogram(audio, fs=RATE, window='hann', nperseg=2048,
+                                                              noverlap=1024)
+
+    # Обновление амплитудно-частотной характеристики
+    freq = frequencies[:int(MAX_FREQUENCY)]
+    amplitude = np.max(spectrogram_data[:int(MAX_FREQUENCY)], axis=1)
+    line.set_ydata(amplitude)
+    ax2.set_xlim(0, MAX_FREQUENCY)
+    ax2.set_ylim(0, np.max(amplitude) * 1.1)
+
+    return(line)
+
+
 
 def animate_spectrogram():
     animation = FuncAnimation(fig, update_spectrogram, frames=None, interval=0, blit=False)
+    animation2 = FuncAnimation(fig2, update_amp_freq, frames=None, interval=0, blit=False)
     plt.show()
 
 def stop_stream():
@@ -144,4 +162,4 @@ def stop_stream():
     stream.close()
     p.terminate()
 
-# animate_spectrogram()
+animate_spectrogram()
