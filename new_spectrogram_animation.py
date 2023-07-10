@@ -2,7 +2,6 @@ import sounddevice as sd
 import librosa
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 
 # Задаем параметры записи звука
 duration = 0.7  # Длительность записи в секундах
@@ -18,7 +17,7 @@ def calculate_num_of_col(spectrogram):
     num_of_col = spectrogram.shape[1]
     print(num_of_col)
 
-def update(frame):
+def update_spectrogram(frame):
     global spectrogram
     global num_of_spectrograms
 
@@ -40,15 +39,15 @@ def update(frame):
     else:
         if spectrogram.shape[1] > num_of_col * 3:
             spectrogram = np.delete(spectrogram, range(num_of_col), axis=1)
-        # new_spectrogram = np.delete(new_spectrogram, range(43), axis=1)
         spectrogram = np.concatenate((spectrogram, new_spectrogram), axis=1)
         print(spectrogram.shape[1])
+
     # Отображаем текущую спектрограмму
     ax.imshow(spectrogram, aspect='auto', origin='lower', cmap='inferno')
     ax.set_title('Спектрограмма')
+    plt.draw()
 
-# Создаем анимацию
-animation = FuncAnimation(fig, update, interval=0)
-
-# Отображаем анимацию
-plt.show()
+# Запускаем обновление спектрограммы в цикле
+while True:
+    update_spectrogram(None)
+    plt.pause(1)

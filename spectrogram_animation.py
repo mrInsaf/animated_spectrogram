@@ -1,20 +1,12 @@
 import time
 
 import pyaudio
-import struct
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 from matplotlib.animation import FuncAnimation
-import tkinter as tk
 from matplotlib.widgets import Slider
-import matplotlib.colors as colors
 import tkinter as tk
-from time import sleep
-import os
-import sys
-import subprocess
-
 
 CHUNK = 1024 * 3
 FORMAT = pyaudio.paInt16
@@ -26,11 +18,9 @@ VMIN = -100
 VMAX = 30
 NOISE_THRESHOLD = -40  # Пороговое значение для шума
 
-
 target_frequency = 50
 tolerance = 20
 times = (0.04643991, 0.02321995)
-
 
 p = pyaudio.PyAudio()
 
@@ -51,6 +41,8 @@ frequencies, _, spectrogram_data = signal.spectrogram(np.zeros(CHUNK), fs=RATE, 
                                                       noverlap=1024)
 spectrogram = ax.imshow(spectrogram_data[:int(MAX_FREQUENCY)], aspect='auto', origin='lower',
                         extent=[times[0], times[-1], frequencies[0], frequencies[-1]], vmax=VMAX, vmin=VMIN)
+# Настройка цветовой карты
+spectrogram.set_cmap('inferno')  # Используйте любую цветовую карту, которая подходит вам
 
 plt.xlabel("Время (секунды)")
 plt.ylabel("Частота (Гц)")
@@ -67,25 +59,26 @@ rects = []
 window = tk.Tk()
 pause = False
 
+
+
 def nearest(lst, target):
-  nearest_value = min(lst, key=lambda x: abs(x-target))
-  return lst.index(nearest_value)
+    nearest_value = min(lst, key=lambda x: abs(x - target))
+    return lst.index(nearest_value)
+
 
 def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
 
+
 # Функция, вызываемая при нажатии кнопки "Анализировать"
 def analyze_button_click():
     global pause, rects
     h = 10
     pause ^= True
-    rect_width = (times[0] - times[1]) / NUM_COLUMNS # Ширина квадрата (длительность временного сегмента)
+    rect_width = (times[0] - times[1]) / NUM_COLUMNS  # Ширина квадрата (длительность временного сегмента)
     rect_x = times[0]
-    rect_y = 0
-    # rect_height = hist_db[0][0][1] - hist_db[0][0][0] # Высота квадрата (диапазон частоты)
-    rect_height = 1000
     print(len(rects))
     if pause:
         for i, col in enumerate(hist_db[-NUM_COLUMNS:]):
@@ -101,7 +94,8 @@ def analyze_button_click():
                 if np.array_equal(noise_freq, np.arange(0, 1025)):
                     rect_xy = (rect_x, rect_y)
                     rect_height = 20000
-                    rect = plt.Rectangle(rect_xy, rect_width, rect_height, facecolor='blue', edgecolor='black', alpha=0.35)
+                    rect = plt.Rectangle(rect_xy, rect_width, rect_height, facecolor='blue', edgecolor='black',
+                                         alpha=0.35)
                     rects.append(rect)
                     ax.add_patch(rect)
                     # plt.pause(0.001)
@@ -123,17 +117,14 @@ def analyze_button_click():
         rects.clear()
         print(len(rects))
 
+
 def detect_50hz_anomaly():
     global pause, rects
     h = 10
     pause ^= True
-    rect_width = (times[0] - times[1]) / NUM_COLUMNS # Ширина квадрата (длительность временного сегмента)
+    rect_width = (times[0] - times[1]) / NUM_COLUMNS  # Ширина квадрата (длительность временного сегмента)
     rect_x = times[0]
-    rect_y = 0
-    # rect_height = hist_db[0][0][1] - hist_db[0][0][0] # Высота квадрата (диапазон частоты)
-    rect_height = 1000
-    # print(len(rects))
-    # Пороговое значение для выделения гармоник
+
     threshold = -110  # Задайте пороговое значение амплитуды в дБ
 
     # Параметры гармоник 50 Гц
@@ -151,7 +142,8 @@ def detect_50hz_anomaly():
                 freq = find_nearest(frequencies, base_frequency * harmonic)
                 freq_idx = np.where(frequencies == freq)[0][0]
                 if amps[freq_idx] > threshold:
-                    rect_width = (times[0] - times[1]) / NUM_COLUMNS  # Ширина квадрата (длительность временного сегмента)
+                    rect_width = (times[0] - times[
+                        1]) / NUM_COLUMNS  # Ширина квадрата (длительность временного сегмента)
                     rect_y = freq
                     rect_height = 100  # Высота квадрата (устанавливаем такую же, как ширина)
                     rect_xy = (rect_x, rect_y)
@@ -166,12 +158,6 @@ def detect_50hz_anomaly():
         rects.clear()
         print(len(rects))
 
-
-        # # Выделение гармоник на спектрограмме
-        # for peak in peaks:
-        #     freq_index, amp = peak
-
-
     plt.show()  # Отобразить спектрограмму с выделенными гармониками
 
 # Создание кнопки
@@ -182,95 +168,102 @@ fifty_hz_button = tk.Button(window, text="Выявить помехи 50гц", c
 noise_button.pack()
 fifty_hz_button.pack()
 
+
 def update_brightness(val):
     brightness = brightness_slider.val  # Получение текущего значения яркости
     spectrogram.set_clim(vmin=brightness)  # Изменение яркости спектрограммы
     fig.canvas.draw_idle()  # Обновление окна
 
+
 def toggle_button_color():
     global fifty_hz_button
     fifty_hz_button.config(bg="red")
 
+
 brightness_slider.on_changed(update_brightness)
+
+
+def build_spectrogram():
+    # Чтение аудиоданных из потока
+    data = stream.read(CHUNK)
+
+    # Преобразование байтовых данных в числовой массив
+    audio = np.frombuffer(data, dtype=np.int16)
+
+    # Расчет спектрограммы
+    frequencies, _, spectrogram_data = signal.spectrogram(audio, fs=RATE, window='hann', nperseg=2048, noverlap=1024)
+    # Перевод амплитуды в дБ
+    y = 100
+    amplitudes = 20 * np.log10(spectrogram_data / y)
+    return spectrogram_data, amplitudes
+
+
+def amps_to_db(spectrogram_data):
+    y = 10 ** 6
+    db = np.array(20 * np.log10(abs(spectrogram_data) / y))
+    hist_db.append(db)
+    return db
+
+
+def detect_peak(db):
+    if -10 <= np.max(db) <= 0:
+        fig.set_facecolor('yellow')
+    if np.max(db) >= 0:
+        fig.set_facecolor('red')
+
+
+def color_harmonic_button(db):
+    fifty_hz_button.config(bg="white")
+    threshold = -80
+    base_frequency = 300
+    num_harmonics = 10
+    amps = []
+    try:
+        for i, point in enumerate(db):
+            amps.append(np.average(point))
+        for harmonic in range(1, num_harmonics):
+            freq = find_nearest(frequencies, base_frequency * harmonic)
+            freq_idx = np.where(frequencies == freq)[0][0]
+            if amps[freq_idx] > threshold:
+                toggle_button_color()
+    except Exception as ex:
+        print(ex)
+        pass
+
 
 def update_spectrogram(a):
     while not pause:
         if len(hist_db) <= NUM_COLUMNS:
             fig.set_facecolor('white')
-            global rect_x, rect
-            global rects
-            global rec_dur
-            global j
-            j += 1
-            fifty_hz_button.config(bg="white")
-            # Пороговое значение для выделения гармоник
-            threshold = -80  # Задайте пороговое значение амплитуды в дБ
 
-            # Параметры гармоник 50 Гц
-            base_frequency = 300  # Базовая частота гармоники
-            num_harmonics = 10  # Количество гармоник для обнаружения
-
-            # Чтение аудиоданных из потока
-            data = stream.read(CHUNK)
-
-            # Преобразование байтовых данных в числовой массив
-            audio = np.frombuffer(data, dtype=np.int16)
-
-            # Расчет спектрограммы
-            frequencies, _, spectrogram_data = signal.spectrogram(audio, fs=RATE, window='hann', nperseg=2048, noverlap=1024)
-            rec_dur += times[1] - times[0]
-            # print(frequencies)
-            y = 1000000
-            db = np.array(20 * np.log10(abs(spectrogram_data) / y))
-            hist_db.append(db)
-            # print(len(db))
-            if -10 <= np.max(db) <= 0:
-                fig.set_facecolor('yellow')
-            if np.max(db) >= 0:
-                fig.set_facecolor('red')
-            # Перевод амплитуды в дБ
-            spectrogram_data = 20 * np.log10(spectrogram_data/100)
-
-            amps = []
-            try:
-                for i, point in enumerate(db):
-                        amps.append(np.average(point))
-                for harmonic in range(1, num_harmonics):
-                    freq = find_nearest(frequencies, base_frequency * harmonic)
-                    freq_idx = np.where(frequencies == freq)[0][0]
-                    if amps[freq_idx] > threshold:
-                        print(harmonic, freq)
-                        toggle_button_color()
-            except Exception as ex:
-                print(ex)
-                pass
-
-            # Настройка цветовой карты для выделения шумов
-            spectrogram.set_cmap('inferno')  # Используйте любую цветовую карту, которая подходит вам
+            spectrogram_data, amplitudes = build_spectrogram()
+            db = amps_to_db(spectrogram_data)
+            detect_peak(db)
+            color_harmonic_button(db)
 
             columns[:, :-1] = columns[:, 1:]
-            columns[:, -1] = spectrogram_data[:int(MAX_FREQUENCY), 0]
+            columns[:, -1] = amplitudes[:int(MAX_FREQUENCY), 0]
             # Обновление спектрограммы
             spectrogram.set_array(columns)
 
-            return (spectrogram)
+            return spectrogram
         else:
             hist_db.pop(0)
 
 
 def animate_spectrogram():
-    animation = FuncAnimation(fig, update_spectrogram, frames=None, interval=0, blit=False)
+    animation = FuncAnimation(fig, update_spectrogram, frames=None, interval=100, blit=False, cache_frame_data=False)
     plt.show()
+
 
 def stop_stream():
     stream.stop_stream()
     stream.close()
     p.terminate()
 
+
 # Start the animation
 animate_spectrogram()
-
-
 
 # Запуск главного цикла обработки событий окна
 window.mainloop()
